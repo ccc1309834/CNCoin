@@ -122,7 +122,7 @@ func (c *Centralbank) PrintVerify(cncoin coin.Coin) bool {
 }
 
 //before Tranfer,should generate a spendSign
-func (c *Centralbank) SpendSign(cncoin *coin.Coin) {
+func (c *Centralbank) SpendSign(cncoin *coin.Coin) []byte {
 	//Use CPK to generate priv
 	m, _ := json.Marshal(cncoin.Head)
 	digest := sm3.Sum(m)
@@ -131,15 +131,15 @@ func (c *Centralbank) SpendSign(cncoin *coin.Coin) {
 	//spendSig is a recoverable sign
 	r, s, v, _ := recover.Sign(rand.Reader, priv, digest[:])
 	spendSig, _ := asn1.Marshal(sm2RecoverSignature{r, s, v})
-	cncoin.SpendSig = spendSig
+	return spendSig
 }
 
-func (c *Centralbank) Transfer(cncoin *coin.Coin, usr *User) error {
+func (c *Centralbank) Transfer(cncoin *coin.Coin, usr *User, spendSig []byte) error {
 	//spendSig
 	m, _ := json.Marshal(cncoin.Head)
 	digest := sm3.Sum(m)
 	sig := new(sm2RecoverSignature)
-	_, err := asn1.Unmarshal(cncoin.SpendSig, sig)
+	_, err := asn1.Unmarshal(spendSig, sig)
 	if err != nil {
 		return errors.New("No SpendSig or SpendSig error")
 	}
@@ -150,8 +150,10 @@ func (c *Centralbank) Transfer(cncoin *coin.Coin, usr *User) error {
 	//set the owner,verify printSig
 	cncoin.Head.Owner = c.Certificate.PublicKey.(*sm2.PublicKey)
 	if !(c.PrintVerify(*cncoin) && cncoin.Head.Printer == "Centralbank" && !cncoin.Isused) {
+		cncoin.Head.Owner = nil
 		return fmt.Errorf("Invalid Coin!")
 	}
+	cncoin.SpendSig = spendSig
 	cncoin.Isused = true
 	cncoin.Head.Owner = nil
 

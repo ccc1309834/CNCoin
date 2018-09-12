@@ -22,24 +22,23 @@ type User struct {
 	CNCoin      []*coin.Coin
 }
 
-func (u *User) SpendSign(cncoin *coin.Coin) {
+func (u *User) SpendSign(cncoin *coin.Coin) []byte {
 	m, _ := json.Marshal(cncoin.Head)
 	digest := sm3.Sum(m)
 	r, s, v, _ := recover.Sign(rand.Reader, u.Priv, digest[:])
 	spendSig, _ := asn1.Marshal(sm2RecoverSignature{r, s, v})
-	cncoin.SpendSig = spendSig
+	return spendSig
 }
 
-func (u *User) SpendCoin(cncoin *coin.Coin, value float32, usr *User) error {
+func (u *User) SpendCoin(cncoin *coin.Coin, spendSig []byte, value float32, usr *User) error {
 	cnbank := NewCentralbank()
-
 	//recover pubk
 	m, _ := json.Marshal(cncoin.Head)
 	digest := sm3.Sum(m)
 	sig := new(sm2RecoverSignature)
-	_, err := asn1.Unmarshal(cncoin.SpendSig, sig)
+	_, err := asn1.Unmarshal(spendSig, sig)
 	if err != nil {
-		return errors.New("No SpendSig or Spendsign error")
+		return errors.New("No SpendSig or SpendSign error")
 	}
 	pubk, err := recover.Recover(digest[:], sig.R, sig.S, sig.V, sm2.P256_sm2())
 	if err != nil {
@@ -49,11 +48,14 @@ func (u *User) SpendCoin(cncoin *coin.Coin, value float32, usr *User) error {
 	cncoin.Head.Owner = pubk
 	if cncoin.Head.Printer == "Centralbank" {
 		if !(cncoin.Isused == false && cnbank.PrintVerify(*cncoin)) {
+			cncoin.Head.Owner = nil
 			return fmt.Errorf("Invalid Coin!")
 		}
 		if cncoin.Head.Value < value {
+			cncoin.Head.Owner = nil
 			return fmt.Errorf("No Enough Value!")
 		}
+		cncoin.SpendSig = spendSig
 		cncoin.Isused = true
 		cncoin.Head.Owner = nil
 		//newcoin
@@ -73,12 +75,16 @@ func (u *User) SpendCoin(cncoin *coin.Coin, value float32, usr *User) error {
 	} else {
 		commercialbank := cnbank.GetComBank(cncoin.Head.Printer)
 		if !(cncoin.Isused == false && commercialbank.PrintVerify(*cncoin)) {
+			cncoin.Head.Owner = nil
 			return fmt.Errorf("Invalid Coin!")
 		}
 		if cncoin.Head.Value < value {
+			cncoin.Head.Owner = nil
 			return fmt.Errorf("No Enough Value!")
 		}
+		cncoin.SpendSig = spendSig
 		cncoin.Isused = true
+		cncoin.Head.Owner = nil
 		//newcoin
 		newcoin := commercialbank.PrintMoney(value)
 		newcoin.Head.Owner = usr.Certificate.PublicKey.(*sm2.PublicKey)

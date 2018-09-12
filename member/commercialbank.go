@@ -27,50 +27,6 @@ type Commercialbank struct {
 	yGab        *big.Int
 }
 
-func (c *Commercialbank) SpendSign(cncoin *coin.Coin) {
-	//Use CPK to generate priv
-	m, _ := json.Marshal(cncoin.Head)
-	digest := sm3.Sum(m)
-	priv := cpk.GeneratePrivateKey(digest[:], c.ProxySKM)
-
-	//spendSig is a recoverable sign
-	r, s, v, _ := recover.Sign(rand.Reader, priv, digest[:])
-	spendSig, _ := asn1.Marshal(sm2RecoverSignature{r, s, v})
-	cncoin.SpendSig = spendSig
-}
-
-func (c *Commercialbank) Transfer(cncoin *coin.Coin, usr *User) error {
-	//recover pubk
-	m, _ := json.Marshal(cncoin.Head)
-	digest := sm3.Sum(m)
-	sig := new(sm2RecoverSignature)
-	_, err := asn1.Unmarshal(cncoin.SpendSig, sig)
-	if err != nil {
-		return errors.New("No SpendSig or Spendsign error")
-	}
-	_, err = recover.Recover(digest[:], sig.R, sig.S, sig.V, sm2.P256_sm2())
-	if err != nil {
-		return err
-	}
-
-	//set the owner
-	cncoin.Head.Owner = c.Certificate.PublicKey.(*sm2.PublicKey)
-	if !(c.PrintVerify(*cncoin) && cncoin.Head.Printer == c.Name && !cncoin.Isused) {
-		return fmt.Errorf("Invalid Coin!")
-	}
-	//set owner nil
-	cncoin.Head.Owner = nil
-	cncoin.Isused = true
-
-	//newcoin
-	newcoin := c.PrintMoney(cncoin.Head.Value)
-	newcoin.Head.Owner = usr.Certificate.PublicKey.(*sm2.PublicKey)
-	newcoin.PrinterSig = c.PrintSign(cncoin.Head)
-	newcoin.Head.Owner = nil
-	usr.CNCoin = append(usr.CNCoin, newcoin)
-	return nil
-}
-
 func (c *Commercialbank) PrintMoney(value float32) *coin.Coin {
 	cnbank := NewCentralbank()
 	head := coin.CoinHead{}
@@ -137,6 +93,52 @@ func (c *Commercialbank) PrintVerify(cncoin coin.Coin) bool {
 		return false
 	}
 	return proxysignature.ProxyVerify(pubk, digest, c.xGab, c.yGab, sm2sig.R, sm2sig.S)
+}
+
+func (c *Commercialbank) SpendSign(cncoin *coin.Coin) []byte {
+	//Use CPK to generate priv
+	m, _ := json.Marshal(cncoin.Head)
+	digest := sm3.Sum(m)
+	priv := cpk.GeneratePrivateKey(digest[:], c.ProxySKM)
+
+	//spendSig is a recoverable sign
+	r, s, v, _ := recover.Sign(rand.Reader, priv, digest[:])
+	spendSig, _ := asn1.Marshal(sm2RecoverSignature{r, s, v})
+	return spendSig
+}
+
+func (c *Commercialbank) Transfer(cncoin *coin.Coin, usr *User, spendSig []byte) error {
+	//recover pubk
+	m, _ := json.Marshal(cncoin.Head)
+	digest := sm3.Sum(m)
+	sig := new(sm2RecoverSignature)
+	_, err := asn1.Unmarshal(spendSig, sig)
+	if err != nil {
+		return errors.New("No SpendSig or Spendsign error")
+	}
+	_, err = recover.Recover(digest[:], sig.R, sig.S, sig.V, sm2.P256_sm2())
+	if err != nil {
+		return err
+	}
+
+	//set the owner
+	cncoin.Head.Owner = c.Certificate.PublicKey.(*sm2.PublicKey)
+	if !(c.PrintVerify(*cncoin) && cncoin.Head.Printer == c.Name && !cncoin.Isused) {
+		cncoin.Head.Owner = nil
+		return fmt.Errorf("Invalid Coin!")
+	}
+	//set owner nil
+	cncoin.SpendSig = spendSig
+	cncoin.Head.Owner = nil
+	cncoin.Isused = true
+
+	//print newcoin
+	newcoin := c.PrintMoney(cncoin.Head.Value)
+	newcoin.Head.Owner = usr.Certificate.PublicKey.(*sm2.PublicKey)
+	newcoin.PrinterSig = c.PrintSign(newcoin.Head)
+	newcoin.Head.Owner = nil
+	usr.CNCoin = append(usr.CNCoin, newcoin)
+	return nil
 }
 
 func (c *Commercialbank) VerifyAuth(kb *big.Int, xGa, yGa *big.Int, sA [N][N]*big.Int, PKM [N][N]*sm2.PublicKey) ([N][N]*sm2.PrivateKey, error) {
