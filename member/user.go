@@ -3,6 +3,7 @@ package member
 import (
 	"CNCoin/coin"
 	"CNCoin/recover"
+	"CNCoin/transactions"
 	"crypto/rand"
 	"crypto/sm2"
 	"crypto/sm3"
@@ -57,21 +58,20 @@ func (u *User) SpendCoin(cncoin *coin.Coin, spendSig []byte, value float32, usr 
 		}
 		cncoin.SpendSig = spendSig
 		cncoin.Isused = true
-		cncoin.Head.Owner = nil
+		cncoin.Head.Owner = u.Certificate.PublicKey.(*sm2.PublicKey)
 		//newcoin
-		newcoin := cnbank.PrintMoney(value)
-		newcoin.Head.Owner = usr.Certificate.PublicKey.(*sm2.PublicKey)
-		newcoin.PrinterSig = cnbank.PrintSign(newcoin.Head)
-		newcoin.Head.Owner = nil
-		usr.CNCoin = append(usr.CNCoin, newcoin)
+		newcoin := cnbank.PrintToUser(value, usr)
+
+		//add tx to Transactions
+		tx := new(transactions.Transaction)
+		tx.Inputs = append(tx.Inputs, cncoin)
+		tx.Outputs = append(tx.Outputs, newcoin)
 		if cncoin.Head.Value > value {
 			//changecoin
-			changecoin := cnbank.PrintMoney(cncoin.Head.Value - value)
-			changecoin.Head.Owner = u.Certificate.PublicKey.(*sm2.PublicKey)
-			changecoin.PrinterSig = cnbank.PrintSign(changecoin.Head)
-			changecoin.Head.Owner = nil
-			u.CNCoin = append(u.CNCoin, changecoin)
+			changecoin := cnbank.PrintToUser(cncoin.Head.Value-value, usr)
+			tx.Outputs = append(tx.Outputs, changecoin)
 		}
+		transactions.Transactions = append(transactions.Transactions, tx)
 	} else {
 		commercialbank := cnbank.GetComBank(cncoin.Head.Printer)
 		if !(cncoin.Isused == false && commercialbank.PrintVerify(*cncoin)) {
@@ -84,21 +84,20 @@ func (u *User) SpendCoin(cncoin *coin.Coin, spendSig []byte, value float32, usr 
 		}
 		cncoin.SpendSig = spendSig
 		cncoin.Isused = true
-		cncoin.Head.Owner = nil
+		cncoin.Head.Owner = u.Certificate.PublicKey.(*sm2.PublicKey)
 		//newcoin
-		newcoin := commercialbank.PrintMoney(value)
-		newcoin.Head.Owner = usr.Certificate.PublicKey.(*sm2.PublicKey)
-		newcoin.PrinterSig = commercialbank.PrintSign(newcoin.Head)
-		newcoin.Head.Owner = nil
-		usr.CNCoin = append(usr.CNCoin, newcoin)
+		newcoin := commercialbank.PrintToUser(value, usr)
+
+		//add tx to Transactions
+		tx := new(transactions.Transaction)
+		tx.Inputs = append(tx.Inputs, cncoin)
+		tx.Outputs = append(tx.Outputs, newcoin)
 		if cncoin.Head.Value > value {
 			//changecoin
-			changecoin := commercialbank.PrintMoney(cncoin.Head.Value - value)
-			changecoin.Head.Owner = u.Certificate.PublicKey.(*sm2.PublicKey)
-			changecoin.PrinterSig = commercialbank.PrintSign(changecoin.Head)
-			changecoin.Head.Owner = nil
-			u.CNCoin = append(u.CNCoin, changecoin)
+			changecoin := commercialbank.PrintToUser(cncoin.Head.Value-value, usr)
+			tx.Outputs = append(tx.Outputs, changecoin)
 		}
+		transactions.Transactions = append(transactions.Transactions, tx)
 	}
 
 	return nil

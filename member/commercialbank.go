@@ -5,6 +5,7 @@ import (
 	"CNCoin/cpk"
 	"CNCoin/proxysignature"
 	"CNCoin/recover"
+	"CNCoin/transactions"
 	"crypto/rand"
 	"crypto/sm2"
 	"crypto/sm3"
@@ -29,7 +30,7 @@ type Commercialbank struct {
 
 func (c *Commercialbank) PrintMoney(value float32) *coin.Coin {
 	cnbank := NewCentralbank()
-	head := coin.CoinHead{}
+	head := new(coin.CoinHead)
 	head.Id = len(cnbank.TotalCNcoin)
 	if head.Id > 0 {
 		for _, value := range cnbank.CNCoin {
@@ -66,10 +67,59 @@ func (c *Commercialbank) PrintMoney(value float32) *coin.Coin {
 	cncoin.Isused = false
 	c.CNCoin = append(c.CNCoin, cncoin)
 	cnbank.TotalCNcoin = append(cnbank.TotalCNcoin, cncoin)
+
+	//add tx to Transactions
+	tx := new(transactions.Transaction)
+	tx.Inputs = append(tx.Inputs, nil)
+	tx.Outputs = append(tx.Outputs, cncoin)
+	transactions.Transactions = append(transactions.Transactions, tx)
 	return cncoin
 }
 
-func (c *Commercialbank) PrintSign(head coin.CoinHead) []byte {
+func (c *Commercialbank) PrintToUser(value float32, usr *User) *coin.Coin {
+	cnbank := NewCentralbank()
+	head := new(coin.CoinHead)
+	head.Id = len(cnbank.TotalCNcoin)
+	if head.Id > 0 {
+		for _, value := range cnbank.CNCoin {
+			if value.Head.Id == head.Id-1 {
+				h := sm3.New()
+				m, _ := json.Marshal(value.Head)
+				h.Write(m)
+				digest := h.Sum(nil)
+				head.Prehash = digest
+			}
+		}
+		for _, value1 := range cnbank.ComBank {
+			for _, value2 := range value1.CNCoin {
+				if value2.Head.Id == head.Id-1 {
+					h := sm3.New()
+					m, _ := json.Marshal(value2.Head)
+					h.Write(m)
+					digest := h.Sum(nil)
+					head.Prehash = digest
+				}
+			}
+		}
+	}
+	head.Value = value
+	head.Owner = usr.Certificate.PublicKey.(*sm2.PublicKey)
+	head.Printer = c.Name
+	sig := c.PrintSign(head)
+	//set the owner nil
+	head.Owner = nil
+
+	cncoin := new(coin.Coin)
+	cncoin.Head = head
+	cncoin.PrinterSig = sig
+	cncoin.Isused = false
+	c.CNCoin = append(c.CNCoin, cncoin)
+	cnbank.TotalCNcoin = append(cnbank.TotalCNcoin, cncoin)
+	usr.CNCoin = append(usr.CNCoin, cncoin)
+	return cncoin
+}
+
+func (c *Commercialbank) PrintSign(head *coin.CoinHead) []byte {
 	m, _ := json.Marshal(head)
 	h := sm3.New()
 	h.Write(m)
@@ -129,15 +179,17 @@ func (c *Commercialbank) Transfer(cncoin *coin.Coin, usr *User, spendSig []byte)
 	}
 	//set owner nil
 	cncoin.SpendSig = spendSig
-	cncoin.Head.Owner = nil
+	cncoin.Head.Owner = c.Certificate.PublicKey.(*sm2.PublicKey)
 	cncoin.Isused = true
 
 	//print newcoin
-	newcoin := c.PrintMoney(cncoin.Head.Value)
-	newcoin.Head.Owner = usr.Certificate.PublicKey.(*sm2.PublicKey)
-	newcoin.PrinterSig = c.PrintSign(newcoin.Head)
-	newcoin.Head.Owner = nil
-	usr.CNCoin = append(usr.CNCoin, newcoin)
+	newcoin := c.PrintToUser(cncoin.Head.Value, usr)
+
+	//add tx to Transactions
+	tx := new(transactions.Transaction)
+	tx.Inputs = append(tx.Inputs, cncoin)
+	tx.Outputs = append(tx.Outputs, newcoin)
+	transactions.Transactions = append(transactions.Transactions, tx)
 	return nil
 }
 

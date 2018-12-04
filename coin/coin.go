@@ -14,7 +14,7 @@ type CoinHead struct {
 }
 
 type Coin struct {
-	Head       CoinHead //coin's head
+	Head       *CoinHead //coin's head
 	Isused     bool     //whether the coin is used
 	PrinterSig []byte   //standard sig，ensure the validity of the coin
 	SpendSig   []byte   //recoverable sig, represent the spending purpose of the coin's user
