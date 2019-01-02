@@ -194,28 +194,7 @@ func (c *Commercialbank) Transfer(cncoin *coin.Coin, usr *User, spendSig []byte)
 }
 
 func (c *Commercialbank) VerifyAuth(kb *big.Int, xGa, yGa *big.Int, sA [N][N]*big.Int, PKM [N][N]*sm2.PublicKey) ([N][N]*sm2.PrivateKey, error) {
-	ProxySKM := [N][N]*sm2.PrivateKey{}
-	for i := range sA {
-		for j := range sA[i] {
-			xGab1, _ := sm2.P256_sm2().ScalarMult(xGa, yGa, kb.Bytes())
-			r, _ := sm2.P256_sm2().ScalarMult(xGa, yGa, sA[i][j].Bytes())
-			R, _ := sm2.P256_sm2().ScalarMult(PKM[i][j].X, PKM[i][j].Y, xGab1.Bytes())
-			if R.Cmp(r) != 0 {
-				return ProxySKM, fmt.Errorf("VerifyAuth fail!")
-			} else {
-				temp := big.NewInt(0)
-				temp.ModInverse(kb, sm2.P256_sm2().N)
-				d := big.NewInt(0)
-				d.Mul(sA[i][j], temp)
-				d.Mod(d, sm2.P256_sm2().N)
-				ProxySKM[i][j] = new(sm2.PrivateKey)
-				ProxySKM[i][j].PublicKey.Curve = sm2.P256_sm2()
-				ProxySKM[i][j].D = d
-				ProxySKM[i][j].PublicKey.X, ProxySKM[i][j].PublicKey.Y = sm2.P256_sm2().ScalarBaseMult(ProxySKM[i][j].D.Bytes())
-			}
-		}
-	}
-	return ProxySKM, nil
+	return proxysignature.VerifyAuth(kb, xGa, yGa, sA, PKM)
 }
 
 func (c *Commercialbank) Show() {

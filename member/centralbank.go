@@ -220,40 +220,7 @@ func (c *Centralbank) Transfer(cncoin *coin.Coin, usr *User, spendSig []byte) er
 }
 
 func (c *Centralbank) GenerateAuth(rand io.Reader, xGb, yGb *big.Int) (*big.Int, *big.Int, *big.Int, *big.Int, [N][N]*big.Int) {
-	ka := big.NewInt(0)
-	xGa := big.NewInt(0)
-	yGa := big.NewInt(0)
-	xGab := big.NewInt(0)
-	yGab := big.NewInt(0)
-	sA := [N][N]*big.Int{}
-	for {
-	Loop:
-		for {
-			ka, _ = proxysignature.Generaterandk(rand)
-			xGa, yGa = sm2.P256_sm2().ScalarBaseMult(ka.Bytes())
-			xGab, yGab = sm2.P256_sm2().ScalarMult(xGb, yGb, ka.Bytes())
-			if xGab.Sign() != 0 {
-				break
-			}
-		}
-		for i := range sA {
-			for j := range sA[i] {
-				temp := big.NewInt(0)
-				temp.ModInverse(ka, sm2.P256_sm2().N)
-				temp1 := big.NewInt(0)
-				temp1.Mul(xGab, c.SKM[i][j].D)
-				temp1.Mod(temp1, sm2.P256_sm2().N)
-				sA[i][j] = big.NewInt(0)
-				sA[i][j].Mul(temp, temp1)
-				sA[i][j].Mod(sA[i][j], sm2.P256_sm2().N)
-				if sA[i][j].Sign() == 0 {
-					goto Loop
-				}
-			}
-		}
-		break
-	}
-	return xGa, yGa, xGab, yGab, sA
+	return proxysignature.GenerateAuth(rand, xGb, yGb, c.SKM)
 }
 
 func (c *Centralbank) Show() {
