@@ -118,29 +118,11 @@ func (u *User) Show() {
 	}
 }
 
-func NewUser1(name string) *User {
+func NewUser(name string, cert *x509.Certificate) *User {
 	usr := new(User)
 	usr.Name = name
-	enpem, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/user/user1/user1_cert.pem")
-	pemcert, _ := pem.Decode(enpem)
-	cert, _ := x509.ParseCertificate(pemcert.Bytes)
 	usr.Certificate = cert
 	raw, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/user/user1/user1_sk")
-	block, _ := pem.Decode(raw)
-	priv, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
-	usr.Priv = priv.(*sm2.PrivateKey)
-	usr.CNCoin = []*coin.Coin{}
-	return usr
-}
-
-func NewUser2(name string) *User {
-	usr := new(User)
-	usr.Name = name
-	enpem, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/user/user2/user2_cert.pem")
-	pemcert, _ := pem.Decode(enpem)
-	cert, _ := x509.ParseCertificate(pemcert.Bytes)
-	usr.Certificate = cert
-	raw, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/user/user2/user2_sk")
 	block, _ := pem.Decode(raw)
 	priv, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
 	usr.Priv = priv.(*sm2.PrivateKey)

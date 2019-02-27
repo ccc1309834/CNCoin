@@ -3,7 +3,10 @@ package main
 import (
 	"CNCoin/member"
 	"CNCoin/transactions"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 )
 
 func main() {
@@ -11,11 +14,20 @@ func main() {
 	cnbank := member.NewCentralbank()
 
 	//创建商业银行
-	cb := member.NewCommercialbank1("cb")
+	cmbankpem1, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/commercialbank/commercialbank1/commercialbank1_cert.pem")
+	cmbankpemcert1, _ := pem.Decode(cmbankpem1)
+	cmbankcert1, _ := x509.ParseCertificate(cmbankpemcert1.Bytes)
+	cb := member.NewCommercialbank("cb", cmbankcert1)
 
 	//创建用户
-	user1 := member.NewUser1("u1")
-	user2 := member.NewUser2("u2")
+	usrpem1, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/user/user1/user1_cert.pem")
+	usrpemcert1, _ := pem.Decode(usrpem1)
+	usrcert1, _ := x509.ParseCertificate(usrpemcert1.Bytes)
+	usrpem2, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/user/user2/user2_cert.pem")
+	usrpemcert2, _ := pem.Decode(usrpem2)
+	usrcert2, _ := x509.ParseCertificate(usrpemcert2.Bytes)
+	user1 := member.NewUser("u1", usrcert1)
+	user2 := member.NewUser("u2", usrcert2)
 
 	//中央银行造币
 	fmt.Println("====================Init====================")

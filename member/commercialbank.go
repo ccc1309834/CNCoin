@@ -12,10 +12,8 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 )
 
@@ -212,13 +210,10 @@ func (c *Commercialbank) Show() {
 	}
 }
 
-func NewCommercialbank1(name string) *Commercialbank {
+func NewCommercialbank(name string,cert *x509.Certificate) *Commercialbank {
 	cnbank := NewCentralbank()
 	commercialbank := new(Commercialbank)
 	commercialbank.Name = name
-	enpem, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/commercialbank/commercialbank1/commercialbank1_cert.pem")
-	pemcert, _ := pem.Decode(enpem)
-	cert, _ := x509.ParseCertificate(pemcert.Bytes)
 	commercialbank.Certificate = cert
 	commercialbank.CNCoin = []*coin.Coin{}
 	kb, _ := proxysignature.Generaterandk(rand.Reader)
@@ -231,21 +226,3 @@ func NewCommercialbank1(name string) *Commercialbank {
 	return commercialbank
 }
 
-func NewCommercialbank2(name string) *Commercialbank {
-	cnbank := NewCentralbank()
-	commercialbank := new(Commercialbank)
-	commercialbank.Name = name
-	enpem, _ := ioutil.ReadFile("/Users/luoyifan/go/src/CNCoin/msp/commercialbank/commercialbank2/commercialbank2_cert.pem")
-	pemcert, _ := pem.Decode(enpem)
-	cert, _ := x509.ParseCertificate(pemcert.Bytes)
-	commercialbank.Certificate = cert
-	commercialbank.CNCoin = []*coin.Coin{}
-	kb, _ := proxysignature.Generaterandk(rand.Reader)
-	xGb, yGb := sm2.P256_sm2().ScalarBaseMult(kb.Bytes())
-	xGa, yGa, xGab, yGab, sA := cnbank.GenerateAuth(rand.Reader, xGb, yGb)
-	commercialbank.xGab = xGab
-	commercialbank.yGab = yGab
-	commercialbank.ProxySKM, _ = commercialbank.VerifyAuth(kb, xGa, yGa, sA, cnbank.PKM)
-	cnbank.ComBank = append(cnbank.ComBank, commercialbank)
-	return commercialbank
-}
